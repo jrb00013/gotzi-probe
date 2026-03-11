@@ -1,6 +1,0 @@
-#!/home/joeblack/Documents/udp-probe/.venv/bin/python
-import sys
-from udp_probe.main import app
-
-if __name__ == '__main__':
-    sys.exit(app())
