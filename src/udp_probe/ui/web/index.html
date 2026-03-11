@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gotzi — Packet Capture</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="toolbar">
+      <h1>Gotzi</h1>
+      <div class="filters">
+        <input type="text" id="filter-port" placeholder="Port (e.g. 12345)" />
+        <input type="text" id="filter-ip" placeholder="IP filter" />
+        <button type="button" id="btn-apply">Apply</button>
+        <button type="button" id="btn-clear">Clear packets</button>
+      </div>
+      <span class="status" id="status">Stopped</span>
+    </header>
+
+    <main class="main">
+      <section class="packet-list-panel">
+        <div class="panel-head">Packet list</div>
+        <div class="table-wrap">
+          <table class="packet-table" id="packet-table">
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Time</th>
+                <th>Source</th>
+                <th>Destination</th>
+                <th>Sport</th>
+                <th>Dport</th>
+                <th>Length</th>
+                <th>Info</th>
+              </tr>
+            </thead>
+            <tbody id="packet-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="detail-panel">
+        <div class="panel-head">Detail</div>
+        <div class="detail-content" id="detail-content">
+          <p class="muted">Select a packet</p>
+        </div>
+      </section>
+
+      <section class="hex-panel">
+        <div class="panel-head">Hex dump</div>
+        <div class="hex-content" id="hex-content">
+          <p class="muted">Select a packet</p>
+        </div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

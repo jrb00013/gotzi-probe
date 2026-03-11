@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gotzi — Capture, Attack, Rules, Honeypot, Security</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="toolbar">
+      <h1>Gotzi</h1>
+      <nav class="tabs" id="main-tabs">
+        <button type="button" class="tab active" data-tab="capture">Capture</button>
+        <button type="button" class="tab" data-tab="attack">Attack</button>
+        <button type="button" class="tab" data-tab="rules">Rules</button>
+        <button type="button" class="tab" data-tab="honeypot">Honeypot</button>
+        <button type="button" class="tab" data-tab="security">Security</button>
+      </nav>
+      <span class="status" id="status">—</span>
+    </header>
+
+    <main class="main">
+      <!-- Capture -->
+      <section id="panel-capture" class="panel active">
+        <div class="filters">
+          <input type="text" id="filter-port" placeholder="Port" />
+          <input type="text" id="filter-ip" placeholder="IP filter" />
+          <button type="button" id="btn-apply">Apply</button>
+          <button type="button" id="btn-clear">Clear packets</button>
+        </div>
+        <div class="packet-list-panel">
+          <div class="panel-head">Packet list</div>
+          <div class="table-wrap">
+            <table class="packet-table" id="packet-table">
+              <thead>
+                <tr>
+                  <th>#</th><th>Time</th><th>Source</th><th>Destination</th><th>Sport</th><th>Dport</th><th>Length</th><th>Info</th>
+                </tr>
+              </thead>
+              <tbody id="packet-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div class="detail-panel">
+          <div class="panel-head">Detail</div>
+          <div class="detail-content" id="detail-content"><p class="muted">Select a packet</p></div>
+        </div>
+        <div class="hex-panel">
+          <div class="panel-head">Hex dump</div>
+          <div class="hex-content" id="hex-content"><p class="muted">Select a packet</p></div>
+        </div>
+      </section>
+
+      <!-- Attack -->
+      <section id="panel-attack" class="panel">
+        <p class="warning">Use only on targets you are authorized to test. All sessions are audit-logged.</p>
+        <div class="form-section">
+          <h3>Flood</h3>
+          <input type="text" id="attack-target" placeholder="Target IP" />
+          <input type="number" id="attack-port" placeholder="Port" />
+          <input type="number" id="attack-duration" placeholder="Duration (sec)" value="5" step="0.5" />
+          <select id="attack-protocol"><option value="udp">UDP</option><option value="tcp">TCP</option></select>
+          <button type="button" id="btn-flood">Run flood</button>
+        </div>
+        <div class="form-section">
+          <h3>Port knock</h3>
+          <input type="text" id="knock-ports" placeholder="Ports e.g. 1000,1001,1002" />
+          <button type="button" id="btn-knock">Run port knock</button>
+        </div>
+        <div class="form-section">
+          <h3>Slowloris</h3>
+          <input type="number" id="slowloris-port" placeholder="Port" value="80" />
+          <input type="number" id="slowloris-duration" placeholder="Duration (sec)" value="30" />
+          <button type="button" id="btn-slowloris">Run slowloris</button>
+        </div>
+        <div class="panel-head">Attack sessions (audit)</div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Type</th><th>Target</th><th>Port</th><th>Started</th></tr></thead><tbody id="attack-sessions-tbody"></tbody></table></div>
+      </section>
+
+      <!-- Rules -->
+      <section id="panel-rules" class="panel">
+        <div class="form-section">
+          <h3>Add rule</h3>
+          <input type="text" id="rule-name" placeholder="Name" />
+          <input type="text" id="rule-regex" placeholder="Payload regex (optional)" />
+          <input type="number" id="rule-port" placeholder="Port (optional)" />
+          <button type="button" id="btn-rule-add">Add</button>
+        </div>
+        <div class="panel-head">Rules</div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Name</th><th>Port</th><th>Regex</th><th>Enabled</th></tr></thead><tbody id="rules-tbody"></tbody></table></div>
+        <div class="panel-head">Rule matches</div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Rule</th><th>Source</th><th>Dest</th><th>Time</th></tr></thead><tbody id="rule-matches-tbody"></tbody></table></div>
+      </section>
+
+      <!-- Honeypot -->
+      <section id="panel-honeypot" class="panel">
+        <div class="form-section">
+          <input type="text" id="honeypot-ports" placeholder="Ports e.g. 22,80,443" />
+          <button type="button" id="btn-honeypot-start">Start</button>
+          <button type="button" id="btn-honeypot-stop">Stop</button>
+        </div>
+        <div class="panel-head">Connection events</div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>ID</th><th>Port</th><th>Protocol</th><th>Source</th><th>Time</th><th>Snippet</th></tr></thead><tbody id="honeypot-events-tbody"></tbody></table></div>
+      </section>
+
+      <!-- Security -->
+      <section id="panel-security" class="panel">
+        <div class="form-section">
+          <input type="text" id="security-target" placeholder="Target IP or hostname" />
+          <button type="button" id="btn-security-scan">Run security scan</button>
+        </div>
+        <div class="panel-head">Findings</div>
+        <div class="table-wrap"><table class="data-table"><thead><tr><th>Port</th><th>Severity</th><th>Message</th></tr></thead><tbody id="security-findings-tbody"></tbody></table></div>
+      </section>
+    </main>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

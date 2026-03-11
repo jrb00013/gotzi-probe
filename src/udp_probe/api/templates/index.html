@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gotzi — Security & Traffic</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4d;
+      --text: #e6edf3;
+      --muted: #8b949e;
+      --accent: #58a6ff;
+      --success: #3fb950;
+      --danger: #f85149;
+    }
+    * { box-sizing: border-box; }
+    body { font-family: ui-monospace, monospace; background: var(--bg); color: var(--text); margin: 0; padding: 1rem; }
+    h1 { font-size: 1.25rem; margin: 0 0 1rem 0; color: var(--accent); }
+    .tabs { display: flex; gap: 0.25rem; margin-bottom: 1rem; flex-wrap: wrap; }
+    .tabs button { background: var(--surface); color: var(--text); border: 1px solid var(--border); padding: 0.5rem 1rem; cursor: pointer; border-radius: 4px; }
+    .tabs button:hover { border-color: var(--accent); }
+    .tabs button.active { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+    .panel { display: none; background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+    .panel.active { display: block; }
+    label { display: block; margin-top: 0.75rem; color: var(--muted); font-size: 0.85rem; }
+    input, select, textarea { width: 100%; max-width: 24rem; padding: 0.5rem; background: var(--bg); border: 1px solid var(--border); color: var(--text); border-radius: 4px; margin-top: 0.25rem; }
+    button.primary { background: var(--accent); color: var(--bg); border: none; padding: 0.5rem 1rem; border-radius: 4px; cursor: pointer; margin-top: 0.75rem; }
+    button.danger { background: var(--danger); color: #fff; }
+    pre, .out { background: var(--bg); padding: 1rem; border-radius: 4px; overflow: auto; max-height: 20rem; font-size: 0.8rem; white-space: pre-wrap; }
+    .status { margin-top: 0.5rem; padding: 0.5rem; border-radius: 4px; }
+    .status.running { background: rgba(63, 185, 80, 0.2); color: var(--success); }
+    .status.error { background: rgba(248, 81, 73, 0.2); color: var(--danger); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); }
+  </style>
+</head>
+<body>
+  <h1>Gotzi</h1>
+  <p style="color: var(--muted); margin: 0 0 1rem 0;">Capture · Scan · Discovery · Digest</p>
+
+  <div class="tabs">
+    <button data-tab="dashboard">Dashboard</button>
+    <button data-tab="capture">Capture</button>
+    <button data-tab="scan">Scan</button>
+    <button data-tab="security-scan">Security Scan</button>
+    <button data-tab="discovery">Discovery</button>
+    <button data-tab="digest">Digest</button>
+    <button data-tab="sessions">Sessions</button>
+    <button data-tab="attack">Attack</button>
+    <button data-tab="alerts">Alerts</button>
+    <button data-tab="honeypot">Honeypot</button>
+    <button data-tab="config">Config</button>
+  </div>
+
+  <div id="panel-capture" class="panel">
+    <label>Name</label>
+    <input id="cap-name" value="session1" />
+    <label>Filter (e.g. port number or leave empty)</label>
+    <input id="cap-filter" placeholder="e.g. 53" />
+    <label><input type="checkbox" id="cap-db" /> Store packets in DB</label>
+    <button class="primary" id="cap-start">Start capture</button>
+    <button class="primary danger" id="cap-stop" style="margin-left: 0.5rem;">Stop</button>
+    <div id="cap-status" class="status" style="display: none;"></div>
+  </div>
+
+  <div id="panel-scan" class="panel">
+    <label>Target (IP or hostname)</label>
+    <input id="scan-target" placeholder="127.0.0.1" />
+    <label>Port range (e.g. 1-1024 or 80,443,8080)</label>
+    <input id="scan-ports" value="1-1024" />
+    <label><input type="checkbox" id="scan-tcp" checked /> TCP</label>
+    <label><input type="checkbox" id="scan-udp" /> UDP</label>
+    <label><input type="checkbox" id="scan-save" checked /> Save to history</label>
+    <button class="primary" id="scan-run">Run scan</button>
+    <div id="scan-out" class="out" style="display: none; margin-top: 1rem;"></div>
+  </div>
+
+  <div id="panel-discovery" class="panel">
+    <label>Targets (comma-separated CIDR or IP; empty = auto-detect subnet)</label>
+    <input id="disc-targets" placeholder="e.g. 192.168.1.0/24" />
+    <label>Ports</label>
+    <input id="disc-ports" value="80,443,22,8080" />
+    <label><input type="checkbox" id="disc-no-ping" /> No ping (port-scan all IPs)</label>
+    <label><input type="checkbox" id="disc-save" checked /> Save run</label>
+    <button class="primary" id="disc-run">Run discovery</button>
+    <div id="disc-out" class="out" style="display: none; margin-top: 1rem;"></div>
+  </div>
+
+  <div id="panel-dashboard" class="panel">
+    <p>Live capture and recent packet stats.</p>
+    <button class="primary" id="dashboard-refresh">Refresh</button>
+    <div id="dashboard-out" class="out" style="margin-top: 1rem;"></div>
+  </div>
+
+  <div id="panel-security-scan" class="panel">
+    <label>Target (IP or hostname)</label>
+    <input id="sec-target" placeholder="127.0.0.1" />
+    <button class="primary" id="sec-run">Run security scan</button>
+    <div id="sec-out" class="out" style="display: none; margin-top: 1rem;"></div>
+  </div>
+
+  <div id="panel-attack" class="panel">
+    <p class="status error">Authorized targets only. All sessions are audit-logged.</p>
+    <label>Type</label>
+    <select id="attack-type"><option value="flood">Flood (UDP/TCP)</option><option value="port-knock">Port knock</option><option value="slowloris">Slowloris</option></select>
+    <label>Target</label>
+    <input id="attack-target" placeholder="192.168.1.1" />
+    <label>Port(s)</label>
+    <input id="attack-port" placeholder="80" />
+    <label>Duration (sec, flood/slowloris)</label>
+    <input id="attack-duration" type="number" value="10" />
+    <button class="primary danger" id="attack-run">Run</button>
+    <div id="attack-out" class="out" style="display: none; margin-top: 1rem;"></div>
+  </div>
+
+  <div id="panel-alerts" class="panel">
+    <p>Alerts and alert rules.</p>
+    <button class="primary" id="alerts-load">Load alerts</button>
+    <button class="primary" id="alerts-rules-load">Load rules</button>
+    <label>Add rule: name</label>
+    <input id="alert-rule-name" placeholder="Rule name" />
+    <button class="primary" id="alert-rule-add">Add rule</button>
+    <div id="alerts-out" class="out" style="margin-top: 1rem;"></div>
+  </div>
+
+  <div id="panel-digest" class="panel">
+    <label>CSV path (probe session)</label>
+    <input id="digest-path" value="udp_session.csv" />
+    <label>Or capture ID (digest from DB)</label>
+    <input id="digest-capture-id" type="number" placeholder="e.g. 1" />
+    <button class="primary" id="digest-run">Digest CSV</button>
+    <button class="primary" id="digest-capture-btn">Digest capture</button>
+    <div id="digest-out" class="out" style="display: none; margin-top: 1rem;"></div>
+  </div>
+
+  <div id="panel-sessions" class="panel">
+    <p>Capture sessions and scan history.</p>
+    <button class="primary" id="sess-refresh">Refresh</button>
+    <p style="margin-top: 1rem;">Scan compare: pick two scans</p>
+    <label>Scan 1</label>
+    <select id="scan-compare-a"><option value="">— load scans first —</option></select>
+    <label>Scan 2</label>
+    <select id="scan-compare-b"><option value="">— load scans first —</option></select>
+    <button class="primary" id="scan-compare-btn">Compare</button>
+    <div id="scan-compare-out" class="out" style="display: none; margin-top: 0.5rem;"></div>
+    <div id="sess-out" class="out" style="margin-top: 1rem;"></div>
+  </div>
+
+  <div id="panel-honeypot" class="panel">
+    <p>Fake open ports; log connection attempts.</p>
+    <label>Ports (comma-separated, e.g. 22,80,443)</label>
+    <input id="hp-ports" placeholder="22,80,443" />
+    <button class="primary" id="hp-start">Start honeypot</button>
+    <button class="primary danger" id="hp-stop">Stop honeypot</button>
+    <button class="primary" id="hp-events">Load events</button>
+    <div id="hp-out" class="out" style="margin-top: 1rem;"></div>
+  </div>
+
+  <div id="panel-config" class="panel">
+    <button class="primary" id="config-load">Load config</button>
+    <div id="config-out" class="out" style="margin-top: 1rem;"></div>
+  </div>
+
+  <script>
+    const API = '';
+    function showPanel(id) {
+      document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+      document.querySelectorAll('.tabs button').forEach(b => b.classList.remove('active'));
+      const panel = document.getElementById('panel-' + id);
+      const btn = document.querySelector('[data-tab="' + id + '"]');
+      if (panel) panel.classList.add('active');
+      if (btn) btn.classList.add('active');
+    }
+    document.querySelectorAll('.tabs button').forEach(b => {
+      b.addEventListener('click', () => showPanel(b.dataset.tab));
+    });
+    showPanel('capture');
+
+    // Capture
+    document.getElementById('cap-start').addEventListener('click', async () => {
+      const name = document.getElementById('cap-name').value || 'session';
+      const filter_expr = document.getElementById('cap-filter').value;
+      const store_in_db = document.getElementById('cap-db').checked;
+      const status = document.getElementById('cap-status');
+      status.style.display = 'block';
+      status.className = 'status';
+      status.textContent = 'Starting…';
+      try {
+        const r = await fetch(API + '/api/capture/start?name=' + encodeURIComponent(name) + '&filter_expr=' + encodeURIComponent(filter_expr) + '&store_in_db=' + store_in_db, { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        status.textContent = 'Capture started (ID: ' + j.capture_id + '). ' + (j.message || '');
+        status.classList.add('running');
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message;
+        status.classList.add('error');
+      }
+    });
+    document.getElementById('cap-stop').addEventListener('click', async () => {
+      const status = document.getElementById('cap-status');
+      try {
+        const r = await fetch(API + '/api/capture/stop', { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        status.textContent = 'Stopped. Packets: ' + (j.packet_count ?? 0);
+      } catch (e) {
+        status.textContent = 'Error: ' + e.message;
+        status.classList.add('error');
+      }
+    });
+    const capStatusEl = document.getElementById('cap-status');
+    setInterval(async () => {
+      if (document.getElementById('panel-capture').classList.contains('active')) {
+        try {
+          const r = await fetch(API + '/api/capture/status');
+          const j = await r.json();
+          if (j.running) {
+            capStatusEl.style.display = 'block';
+            capStatusEl.textContent = 'Running — packets: ' + (j.packet_count ?? 0) + ', bytes: ' + (j.byte_count ?? 0);
+            capStatusEl.className = 'status running';
+          }
+        } catch (_) {}
+      }
+    }, 2000);
+
+    // Scan
+    document.getElementById('scan-run').addEventListener('click', async () => {
+      const target = document.getElementById('scan-target').value.trim();
+      const ports = document.getElementById('scan-ports').value || '1-1024';
+      const scan_tcp = document.getElementById('scan-tcp').checked;
+      const scan_udp = document.getElementById('scan-udp').checked;
+      const save = document.getElementById('scan-save').checked;
+      const out = document.getElementById('scan-out');
+      out.style.display = 'block';
+      out.textContent = 'Scanning…';
+      try {
+        const q = new URLSearchParams({ target, port_spec: ports, scan_tcp, scan_udp, save });
+        const r = await fetch(API + '/api/scan/run?' + q, { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        const open = (j.results || []).filter(x => x.state === 'open' || x.state === 'open|filtered');
+        out.textContent = 'Scan ID: ' + j.scan_id + '\nOpen: ' + open.length + ' / ' + j.total_ports + '\n\n' + JSON.stringify(open.length ? open : j.results?.slice(0, 20), null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    // Discovery
+    document.getElementById('disc-run').addEventListener('click', async () => {
+      const targets = document.getElementById('disc-targets').value.trim();
+      const ports = document.getElementById('disc-ports').value;
+      const no_ping = document.getElementById('disc-no-ping').checked;
+      const save = document.getElementById('disc-save').checked;
+      const out = document.getElementById('disc-out');
+      out.style.display = 'block';
+      out.textContent = 'Discovering…';
+      try {
+        const q = new URLSearchParams({ targets, ports, no_ping, save });
+        const r = await fetch(API + '/api/discovery/run?' + q, { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        out.textContent = 'Hosts: ' + j.host_count + '\n\n' + JSON.stringify(j.hosts || [], null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    // Dashboard
+    document.getElementById('dashboard-refresh').addEventListener('click', async () => {
+      const out = document.getElementById('dashboard-out');
+      try {
+        const r = await fetch(API + '/api/dashboard/stats');
+        const j = await r.json();
+        let html = '<p><strong>Live:</strong> ' + (j.live?.running ? 'running' : 'stopped') + ' — packets: ' + (j.live?.packet_count ?? 0) + ', bytes: ' + (j.live?.byte_count ?? 0) + '</p>';
+        html += '<p>Recent (DB): ' + (j.recent_packets ?? 0) + ' packets, ' + (j.recent_bytes ?? 0) + ' bytes</p>';
+        if (j.top_src_ips && j.top_src_ips.length) {
+          html += '<table><tr><th>Source IP</th><th>Count</th></tr>';
+          j.top_src_ips.forEach(function(x) { html += '<tr><td>' + x[0] + '</td><td>' + x[1] + '</td></tr>'; });
+          html += '</table>';
+        }
+        if (j.top_dst_ports && j.top_dst_ports.length) {
+          html += '<table><tr><th>Dest port</th><th>Count</th></tr>';
+          j.top_dst_ports.forEach(function(x) { html += '<tr><td>' + x[0] + '</td><td>' + x[1] + '</td></tr>'; });
+          html += '</table>';
+        }
+        out.innerHTML = html + '<pre>' + JSON.stringify(j, null, 2) + '</pre>';
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    // Security scan
+    document.getElementById('sec-run').addEventListener('click', async () => {
+      const target = document.getElementById('sec-target').value.trim();
+      const out = document.getElementById('sec-out');
+      out.style.display = 'block';
+      out.textContent = 'Scanning…';
+      try {
+        const r = await fetch(API + '/api/security-scan?target=' + encodeURIComponent(target));
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        out.textContent = 'Findings: ' + (j.count || 0) + '\n\n' + JSON.stringify(j.findings || [], null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    // Attack
+    document.getElementById('attack-run').addEventListener('click', async () => {
+      const type = document.getElementById('attack-type').value;
+      const target = document.getElementById('attack-target').value.trim();
+      const portStr = document.getElementById('attack-port').value.trim();
+      const duration = parseFloat(document.getElementById('attack-duration').value) || 10;
+      const out = document.getElementById('attack-out');
+      out.style.display = 'block';
+      try {
+        if (type === 'flood') {
+          const r = await fetch(API + '/attack/flood', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, port: parseInt(portStr, 10) || 80, duration_sec: duration, protocol: 'udp' }) });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+          out.textContent = 'Session: ' + (j.attack_session_id || j) + '\n' + (j.warning || '');
+        } else if (type === 'port-knock') {
+          const ports = portStr.split(',').map(p => parseInt(p.trim(), 10)).filter(Boolean);
+          const r = await fetch(API + '/attack/port-knock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, ports, protocol: 'udp', delay_sec: 0.2 }) });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+          out.textContent = 'Session: ' + (j.attack_session_id || j);
+        } else if (type === 'slowloris') {
+          const r = await fetch(API + '/attack/slowloris', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target, port: parseInt(portStr, 10) || 80, duration_sec: duration, num_sockets: 200 }) });
+          const j = await r.json();
+          if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+          out.textContent = 'Session: ' + (j.attack_session_id || j);
+        }
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    // Alerts
+    document.getElementById('alerts-load').addEventListener('click', async () => {
+      const out = document.getElementById('alerts-out');
+      try {
+        const r = await fetch(API + '/api/alerts');
+        const j = await r.json();
+        out.textContent = 'Alerts:\n' + JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+    document.getElementById('alerts-rules-load').addEventListener('click', async () => {
+      const out = document.getElementById('alerts-out');
+      try {
+        const r = await fetch(API + '/api/alerts/rules');
+        const j = await r.json();
+        out.textContent = 'Rules:\n' + JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+    document.getElementById('alert-rule-add').addEventListener('click', async () => {
+      const name = document.getElementById('alert-rule-name').value.trim();
+      const out = document.getElementById('alerts-out');
+      if (!name) { out.textContent = 'Enter a rule name'; return; }
+      try {
+        const r = await fetch(API + '/api/alerts/rules?name=' + encodeURIComponent(name) + '&condition=threshold', { method: 'POST' });
+        const j = await r.json();
+        out.textContent = 'Added: ' + JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    // Digest
+    document.getElementById('digest-run').addEventListener('click', async () => {
+      const file_path = document.getElementById('digest-path').value || 'udp_session.csv';
+      const out = document.getElementById('digest-out');
+      out.style.display = 'block';
+      try {
+        const r = await fetch(API + '/api/digest/csv?file_path=' + encodeURIComponent(file_path));
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        out.textContent = JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+    document.getElementById('digest-capture-btn').addEventListener('click', async () => {
+      const cid = document.getElementById('digest-capture-id').value.trim();
+      const out = document.getElementById('digest-out');
+      out.style.display = 'block';
+      if (!cid) { out.textContent = 'Enter a capture ID'; return; }
+      try {
+        const r = await fetch(API + '/api/digest/capture/' + cid);
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        out.textContent = JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    // Sessions refresh + populate scan compare dropdowns
+    document.getElementById('sess-refresh').addEventListener('click', async () => {
+      const out = document.getElementById('sess-out');
+      try {
+        const [cap, scanList] = await Promise.all([
+          fetch(API + '/api/capture/sessions').then(r => r.json()),
+          fetch(API + '/api/scan/history').then(r => r.json()),
+        ]);
+        out.textContent = 'Captures:\n' + JSON.stringify(cap, null, 2) + '\n\nScans:\n' + JSON.stringify(scanList, null, 2);
+        const selA = document.getElementById('scan-compare-a');
+        const selB = document.getElementById('scan-compare-b');
+        selA.innerHTML = selB.innerHTML = '<option value="">— select —</option>';
+        (scanList || []).forEach(function(s) {
+          const opt = '<option value="' + s.id + '">' + s.id + ' ' + (s.target || '') + ' ' + (s.port_range || '') + '</option>';
+          selA.innerHTML += opt;
+          selB.innerHTML += opt;
+        });
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+    // Scan compare
+    document.getElementById('scan-compare-btn').addEventListener('click', async () => {
+      const id1 = document.getElementById('scan-compare-a').value;
+      const id2 = document.getElementById('scan-compare-b').value;
+      const out = document.getElementById('scan-compare-out');
+      if (!id1 || !id2) { out.style.display = 'block'; out.textContent = 'Select two scans.'; return; }
+      if (id1 === id2) { out.style.display = 'block'; out.textContent = 'Select different scans.'; return; }
+      try {
+        const r = await fetch(API + '/api/scan/diff/' + id1 + '/' + id2);
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        out.style.display = 'block';
+        out.textContent = 'New open: ' + (j.new_open_ports || []).join(', ') + '\nNewly closed: ' + (j.newly_closed_ports || []).join(', ') + '\n\n' + JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.style.display = 'block';
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+    // Honeypot
+    document.getElementById('hp-start').addEventListener('click', async () => {
+      const portsStr = document.getElementById('hp-ports').value.trim() || '22,80,443';
+      const ports = portsStr.split(',').map(function(p) { return parseInt(p.trim(), 10); }).filter(Boolean);
+      const out = document.getElementById('hp-out');
+      try {
+        const r = await fetch(API + '/honeypot/start', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ports: ports }) });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        out.textContent = (j.message || 'Started') + '\n' + JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+    document.getElementById('hp-stop').addEventListener('click', async () => {
+      const out = document.getElementById('hp-out');
+      try {
+        const r = await fetch(API + '/honeypot/stop', { method: 'POST' });
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        out.textContent = (j.message || 'Stopped') + '\n' + JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+    document.getElementById('hp-events').addEventListener('click', async () => {
+      const out = document.getElementById('hp-out');
+      try {
+        const r = await fetch(API + '/honeypot/events');
+        const j = await r.json();
+        if (!r.ok) throw new Error(j.detail || JSON.stringify(j));
+        out.textContent = JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+
+    // Config
+    document.getElementById('config-load').addEventListener('click', async () => {
+      const out = document.getElementById('config-out');
+      try {
+        const r = await fetch(API + '/api/config');
+        const j = await r.json();
+        out.textContent = JSON.stringify(j, null, 2);
+      } catch (e) {
+        out.textContent = 'Error: ' + e.message;
+      }
+    });
+  </script>
+</body>
+</html>
